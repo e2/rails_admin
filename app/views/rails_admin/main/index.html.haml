@@ -7,8 +7,12 @@
   sort = params[:sort]
   params.delete(:sort) if params[:sort] == @model_config.list.sort_by.to_s
 
-  export_action = RailsAdmin::Config::Actions.find(:export, { :controller => self.controller, :abstract_model => @abstract_model })
-  export_action = export_action && authorized?(export_action.authorization_key, @abstract_model) ? export_action : nil
+  tool_actions = [:pdf_bundle, :export].map do |action_name|
+    RailsAdmin::Config::Actions.find(action_name, { :controller => self.controller, :abstract_model => @abstract_model })
+  end.compact.select do |action|
+    authorized?(action.authorization_key, @abstract_model)
+  end.map{|action| [action, "#{action.action_name}_path".to_sym]}
+
 
   properties = @model_config.list.with(:view => self, :object => @abstract_model.model.new).visible_fields
   # columns paginate
@@ -80,8 +84,10 @@
       %button.btn.btn-primary{:type => "submit", :'data-disable-with' => "<i class='icon-white icon-refresh'></i> ".html_safe + t("admin.misc.refresh")}
         %i.icon-white.icon-refresh
         = t("admin.misc.refresh")
-      - if export_action
-        %span{:style => 'float:right'}= link_to wording_for(:link, export_action), export_path(params.except('set').except('page')), :class => 'btn btn-info'
+
+      - tool_actions.each do |action, path|
+        %span{:style => 'float:right'}
+          = link_to_function wording_for(:bulk_link, action), "jQuery('#bulk_action').val('#{action.action_name}'); jQuery('#bulk_form').submit()", :class => 'btn btn-info'
 
   = form_tag bulk_action_path(:model_name => @abstract_model.to_param), :method => :post, :id => "bulk_form", :class => "form" do
     = hidden_field_tag :bulk_action
